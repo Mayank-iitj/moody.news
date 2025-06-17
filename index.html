@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Emotion-Aware News Aggregator</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:700|Lora:400,600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { margin: 0; font-family: 'Lora', Arial, sans-serif; background: linear-gradient(120deg, #e0e7ff 0%, #f8fafc 100%); min-height: 100vh; color: #1e293b; }
+    header { text-align: center; margin-bottom: 2rem; padding-top: 2rem; }
+    h1 { font-family: 'Montserrat', serif; font-size: 2.5rem; font-weight: 700; color: #2563eb; margin-bottom: 0.5rem; letter-spacing: 1px; text-shadow: 0 2px 8px #2563eb22; }
+    .subtitle { font-size: 1.1rem; color: #14b8a6; margin-bottom: 1.5rem; font-family: 'Montserrat', serif; font-weight: 600; letter-spacing: 0.5px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1rem; display: flex; flex-wrap: wrap; gap: 2rem; justify-content: center; }
+    .news-feed { flex: 2 1 400px; min-width: 340px; background: #fff; border-radius: 18px; box-shadow: 0 4px 24px rgba(30,41,59,0.08); padding: 2rem 2rem 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+    .mood-map-panel { flex: 1 1 320px; min-width: 260px; background: #f1f5f9; border-radius: 18px; box-shadow: 0 4px 24px rgba(30,41,59,0.06); padding: 1.5rem; display: flex; flex-direction: column; align-items: center; }
+    .emotion-filter-bar { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 1rem; justify-content: flex-start; }
+    .emotion-btn { background: #f1f5f9; border: 2px solid #e0e7ef; border-radius: 10px; padding: 0.5em 1.2em; font-size: 1em; font-weight: 600; color: #2563eb; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; min-width: 90px; text-align: center; opacity: 0.85; }
+    .emotion-btn.selected, .emotion-btn:focus { background: #2563eb; color: #fff; border-color: #2563eb; transform: scale(1.06); opacity: 1; }
+    .news-section-title { font-family: 'Montserrat', serif; font-size: 1.2rem; color: #2563eb; margin: 1.2em 0 0.5em 0; font-weight: 700; }
+    .news-card { background: #f8fafc; border-radius: 12px; box-shadow: 0 2px 8px #2563eb11; padding: 1.2em 1.5em; margin-bottom: 0.7em; transition: box-shadow 0.2s, transform 0.2s; display: flex; flex-direction: column; gap: 0.5em; }
+    .news-card:hover { box-shadow: 0 6px 24px #14b8a633; transform: translateY(-2px) scale(1.01); }
+    .news-title { font-family: 'Montserrat', serif; font-size: 1.15rem; font-weight: 700; color: #2563eb; margin-bottom: 0.2em; }
+    .news-meta { font-size: 0.95em; color: #64748b; margin-bottom: 0.2em; }
+    .emotion-tags { display: flex; gap: 0.5em; margin-top: 0.2em; }
+    .emotion-tag { border-radius: 8px; padding: 0.2em 0.7em; font-size: 0.98em; font-weight: 600; color: #fff; background: #2563eb; opacity: 0.85; display: flex; align-items: center; gap: 0.3em; }
+    .emotion-tag.joy { background: #facc15; color: #b45309; }
+    .emotion-tag.trust { background: #34d399; color: #065f46; }
+    .emotion-tag.fear { background: #f87171; color: #991b1b; }
+    .emotion-tag.surprise { background: #38bdf8; color: #0e7490; }
+    .emotion-tag.sadness { background: #818cf8; color: #3730a3; }
+    .emotion-tag.anger { background: #ef4444; color: #7f1d1d; }
+    .emotion-tag.anticipation { background: #fbbf24; color: #92400e; }
+    .emotion-tag.calm { background: #60a5fa; color: #1e40af; }
+    .emotion-tag.inspiring { background: #f472b6; color: #831843; }
+    .emotion-tag.uplifting { background: #fde68a; color: #92400e; }
+    .news-summary { font-size: 1em; color: #374151; margin-bottom: 0.2em; }
+    .news-link { color: #14b8a6; text-decoration: underline; font-size: 0.98em; margin-top: 0.2em; transition: color 0.2s; }
+    .news-link:hover { color: #2563eb; }
+    @media (max-width: 900px) { .container { flex-direction: column; gap: 1.5rem; } .news-feed, .mood-map-panel { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Emotion-Aware News Aggregator</h1>
+    <div class="subtitle">Past News, Present News, and Future Predictions</div>
+  </header>
+  <div class="container">
+    <section class="news-feed">
+      <div class="emotion-filter-bar" id="emotionFilterBar"></div>
+      <div id="newsPast"></div>
+      <div id="newsPresent"></div>
+      <div id="newsFuture"></div>
+    </section>
+    <aside class="mood-map-panel">
+      <h3 style="font-family:'Montserrat',serif;color:#2563eb;margin-bottom:1em;">Global Mood Map</h3>
+      <canvas id="moodMap" width="280" height="280"></canvas>
+      <div style="font-size:0.98em;color:#64748b;margin-top:1em;">(Demo: emotion distribution)</div>
+    </aside>
+  </div>
+  <script>
+    // --- Emotion Filter Bar ---
+    const EMOTIONS = [
+      { key: "joy", label: "😊 Joy" },
+      { key: "trust", label: "🤝 Trust" },
+      { key: "fear", label: "😱 Fear" },
+      { key: "surprise", label: "😮 Surprise" },
+      { key: "sadness", label: "😢 Sadness" },
+      { key: "anger", label: "😡 Anger" },
+      { key: "anticipation", label: "🤔 Anticipation" },
+      { key: "calm", label: "🧘 Calm" },
+      { key: "inspiring", label: "🌟 Inspiring" },
+      { key: "uplifting", label: "🌞 Uplifting" }
+    ];
+    let selectedEmotions = [];
+    let newsData = [];
+
+    function renderEmotionFilterBar() {
+      const bar = document.getElementById('emotionFilterBar');
+      bar.innerHTML = '';
+      EMOTIONS.forEach(e => {
+        const btn = document.createElement('button');
+        btn.className = 'emotion-btn' + (selectedEmotions.includes(e.key) ? ' selected' : '');
+        btn.textContent = e.label;
+        btn.onclick = () => {
+          if (selectedEmotions.includes(e.key)) {
+            selectedEmotions = selectedEmotions.filter(k => k !== e.key);
+          } else {
+            selectedEmotions.push(e.key);
+          }
+          renderEmotionFilterBar();
+          renderNewsSections();
+        };
+        bar.appendChild(btn);
+      });
+    }
+
+    // --- Fetch News from Backend or API ---
+    async function fetchNews() {
+      // Replace this with your backend API call!
+      // For demo, we'll use static data and shuffle it
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+
+      const DEMO_NEWS = [
+        // Past
+        {
+          title: "Breakthrough in Renewable Energy Announced",
+          summary: "A new solar panel technology promises to double efficiency and reduce costs.",
+          url: "#",
+          source: "Science Daily",
+          date: yesterday.toISOString().slice(0,10),
+          emotions: ["joy", "inspiring", "uplifting"]
+        },
+        // Present
+        {
+          title: "Global Markets React to Economic Uncertainty",
+          summary: "Stock indices fell sharply amid fears of a global recession.",
+          url: "#",
+          source: "Reuters",
+          date: today.toISOString().slice(0,10),
+          emotions: ["fear", "anticipation", "sadness"]
+        },
+        {
+          title: "Community Rallies to Support Local Families",
+          summary: "Volunteers organize food drives and support networks for those in need.",
+          url: "#",
+          source: "Local News",
+          date: today.toISOString().slice(0,10),
+          emotions: ["trust", "joy", "uplifting"]
+        },
+        // Future
+        {
+          title: "AI Predicts Major Advances in Medicine by Next Year",
+          summary: "Experts forecast breakthroughs in personalized treatments and diagnostics.",
+          url: "#",
+          source: "AI News",
+          date: tomorrow.toISOString().slice(0,10),
+          emotions: ["anticipation", "inspiring", "joy"],
+          isPrediction: true
+        },
+        {
+          title: "Climate Change Solutions Expected to Accelerate",
+          summary: "Analysts predict rapid adoption of green tech in the coming months.",
+          url: "#",
+          source: "Eco Times",
+          date: tomorrow.toISOString().slice(0,10),
+          emotions: ["anticipation", "calm", "uplifting"],
+          isPrediction: true
+        }
+      ];
+      // Shuffle for demo
+      newsData = DEMO_NEWS.sort(() => Math.random() - 0.5);
+    }
+
+    function renderNewsSections() {
+      const todayStr = new Date().toISOString().slice(0,10);
+      const newsPast = newsData.filter(a => a.date < todayStr && !a.isPrediction);
+      const newsPresent = newsData.filter(a => a.date === todayStr && !a.isPrediction);
+      const newsFuture = newsData.filter(a => a.date > todayStr || a.isPrediction);
+
+      renderNewsList(newsPast, "newsPast", "Past News");
+      renderNewsList(newsPresent, "newsPresent", "Present News");
+      renderNewsList(newsFuture, "newsFuture", "Future Predictions");
+      renderMoodMap();
+    }
+
+    function renderNewsList(articles, containerId, sectionTitle) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = `<div class="news-section-title">${sectionTitle}</div>`;
+      articles.filter(article =>
+        selectedEmotions.length === 0 ||
+        article.emotions.some(e => selectedEmotions.includes(e))
+      ).forEach(article => {
+        const card = document.createElement('div');
+        card.className = 'news-card';
+        card.innerHTML = `
+          <div class="news-title">${article.title}</div>
+          <div class="news-meta">${article.source} &middot; ${article.date}${article.isPrediction ? " <span style='color:#f59e42'>(Prediction)</span>" : ""}</div>
+          <div class="news-summary">${article.summary}</div>
+          <div class="emotion-tags">
+            ${article.emotions.map(e =>
+              `<span class="emotion-tag ${e}">${EMOTIONS.find(x=>x.key===e)?.label||e}</span>`
+            ).join('')}
+          </div>
+          <a class="news-link" href="${article.url}" target="_blank">Read more</a>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // --- Mood Map Visualization (Pie Chart) ---
+    function renderMoodMap() {
+      const ctx = document.getElementById('moodMap').getContext('2d');
+      const emotionCounts = {};
+      newsData.forEach(article => {
+        article.emotions.forEach(e => {
+          emotionCounts[e] = (emotionCounts[e] || 0) + 1;
+        });
+      });
+      const data = {
+        labels: Object.keys(emotionCounts).map(k => EMOTIONS.find(e=>e.key===k)?.label || k),
+        datasets: [{
+          data: Object.values(emotionCounts),
+          backgroundColor: [
+            "#facc15", "#34d399", "#f87171", "#38bdf8", "#818cf8",
+            "#ef4444", "#fbbf24", "#60a5fa", "#f472b6", "#fde68a"
+          ],
+          borderWidth: 2
+        }]
+      };
+      if (window.moodChart) window.moodChart.destroy();
+      window.moodChart = new Chart(ctx, {
+        type: 'pie',
+        data,
+        options: {
+          plugins: {
+            legend: { display: true, position: 'bottom' }
+          },
+          animation: { animateRotate: true, duration: 1200 }
+        }
+      });
+    }
+
+    // --- Init ---
+    renderEmotionFilterBar();
+
+    async function updateNewsRealtime() {
+      await fetchNews();
+      renderNewsSections();
+    }
+
+    // Initial load
+    updateNewsRealtime();
+    // Update every 10 seconds
+    setInterval(updateNewsRealtime, 10000);
+  </script>
+</body>
+</html>
