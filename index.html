@@ -272,6 +272,43 @@
     </ul>
   </div>
   <div id="updateIndicator" class="update-indicator">New stories available! <button onclick="reloadNews()" class="btn btn-sm btn-warning ms-2">Refresh</button></div>
+  <!-- Move watermark (credit) to upper right corner and style it -->
+  <div id="credit" style="
+    position: fixed;
+    top: 18px;
+    right: 24px;
+    z-index: 3000;
+    text-align: right;
+    margin-top: 0;
+    pointer-events: none;
+  ">
+    <span style="
+      display: inline-block;
+      font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+      font-weight: 700;
+      font-size: 1.1em;
+      letter-spacing: 0.03em;
+      color: #6c63ff;
+      background: linear-gradient(90deg,#ffe066 0%,#6c63ff 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: fadeInCredit 2s cubic-bezier(.4,2,.6,1);
+      box-shadow: none;
+      pointer-events: auto;
+    ">
+      Built by Mayank Sharma
+    </span>
+  </div>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap');
+    @keyframes fadeInCredit {
+      0% { opacity: 0; transform: translateY(30px) scale(0.95);}
+      100% { opacity: 1; transform: translateY(0) scale(1);}
+    }
+    #credit { user-select: none; }
+  </style>
+  <!-- Weather Widget: Show realtime weather based on user's location -->
   <div id="weatherWidget" class="container mb-3" style="max-width:600px;">
     <div class="card shadow-sm" style="border-radius:1em;">
       <div class="card-body d-flex align-items-center" id="weatherContent">
@@ -279,13 +316,80 @@
       </div>
     </div>
   </div>
-  <div id="stocksWidget" class="container mb-3" style="max-width:600px;">
-    <div class="card shadow-sm" style="border-radius:1em;">
-      <div class="card-body" id="stocksContent">
-        <span>Loading stocks...</span>
+  <script>
+    // Weather: Get user's location and fetch weather from public free API (wttr.in)
+    function showWeather(city, temp, desc, iconUrl) {
+      document.getElementById('weatherContent').innerHTML = `
+        <img src="${iconUrl}" alt="${desc}" style="width:48px;height:48px;margin-right:12px;">
+        <div>
+          <div style="font-weight:700;font-size:1.1em;">${city}</div>
+          <div>${desc}, <b>${temp}&deg;C</b></div>
+        </div>
+      `;
+    }
+    function fetchWeather(city) {
+      // Using wttr.in public API (no key required)
+      fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`)
+        .then(res => res.json())
+        .then(data => {
+          const area = data.nearest_area?.[0]?.areaName?.[0]?.value || city;
+          const temp = data.current_condition?.[0]?.temp_C || "--";
+          const desc = data.current_condition?.[0]?.weatherDesc?.[0]?.value || "N/A";
+          const iconUrl = data.current_condition?.[0]?.weatherIconUrl?.[0]?.value || "https://wttr.in/files/0.png";
+          showWeather(area, temp, desc, iconUrl);
+        })
+        .catch(() => {
+          document.getElementById('weatherContent').innerHTML = '<span class="text-danger">Weather unavailable</span>';
+        });
+    }
+    // Try geolocation first, fallback to Delhi
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          fetch(`https://wttr.in/${pos.coords.latitude},${pos.coords.longitude}?format=j1`)
+            .then(res => res.json())
+            .then(data => {
+              const area = data.nearest_area?.[0]?.areaName?.[0]?.value || "Your Location";
+              const temp = data.current_condition?.[0]?.temp_C || "--";
+              const desc = data.current_condition?.[0]?.weatherDesc?.[0]?.value || "N/A";
+              const iconUrl = data.current_condition?.[0]?.weatherIconUrl?.[0]?.value || "https://wttr.in/files/0.png";
+              showWeather(area, temp, desc, iconUrl);
+            })
+            .catch(() => fetchWeather('Delhi'));
+        },
+        () => fetchWeather('Delhi'),
+        { timeout: 5000 }
+      );
+    } else {
+      fetchWeather('Delhi');
+    }
+  </script>
+
+  <!-- Stocks Widget: Redirect to BSE website on click, with animated effect -->
+  <div id="stocksWidget" class="container mb-3" style="max-width:600px; cursor:pointer;" onclick="window.open('https://www.bseindia.com/', '_blank')">
+    <div class="card shadow-sm stock-card-anim" style="border-radius:1em; transition: box-shadow 0.3s, transform 0.3s;">
+      <div class="card-body" id="stocksContent" style="color:#23272f; font-size:1.15em; font-weight:600; text-align:center;">
+        <span class="bse-redirect-text">
+          Click here to view live stocks on <span style="color:#6c63ff; font-weight:700;">BSE India</span> &rarr;
+        </span>
       </div>
     </div>
   </div>
+  <style>
+    .stock-card-anim:hover {
+      box-shadow: 0 8px 32px rgba(76,97,255,0.18);
+      transform: scale(1.04) translateY(-4px) rotate(-1deg);
+      transition: box-shadow 0.3s, transform 0.3s;
+    }
+    .bse-redirect-text {
+      animation: bsePulse 1.5s infinite alternate;
+      letter-spacing: 0.03em;
+    }
+    @keyframes bsePulse {
+      0% { color: #23272f; }
+      100% { color: #6c63ff; text-shadow: 0 0 8px #ffe066; }
+    }
+  </style>
   <div id="trendingWidget" class="container mb-3" style="max-width:600px;">
     <div class="card shadow-sm" style="border-radius:1em;">
       <div class="card-body" id="trendingContent">
@@ -889,3 +993,4 @@ function googleTranslateElementInit() {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
